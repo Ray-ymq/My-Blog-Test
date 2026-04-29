@@ -1,0 +1,110 @@
+---
+import { siteConfig } from '@/config/site';
+import NightSky from '@/components/NightSky.astro';
+import ThemeToggle from '@/components/ThemeToggle.astro';
+import '@/styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+}
+
+const {
+  title = siteConfig.title,
+  description = siteConfig.description,
+  image = siteConfig.avatar
+} = Astro.props;
+
+const pageTitle = title === siteConfig.title ? title : `${title} | ${siteConfig.title}`;
+const canonical = new URL(Astro.url.pathname, siteConfig.siteUrl).toString();
+const ogImage = new URL(image, siteConfig.siteUrl).toString();
+const currentPath = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <script is:inline>
+      (() => {
+        const storageKey = 'theme';
+        const root = document.documentElement;
+        const fromUrl = new URLSearchParams(window.location.search).get(storageKey);
+        let theme = fromUrl === 'dark' || fromUrl === 'light' ? fromUrl : null;
+
+        try {
+          theme ||= localStorage.getItem(storageKey);
+        } catch {
+          theme = null;
+        }
+
+        if (theme !== 'dark' && theme !== 'light') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+
+        if (fromUrl === 'dark' || fromUrl === 'light') {
+          try {
+            localStorage.setItem(storageKey, theme);
+          } catch {}
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <NightSky />
+    <header class="site-header">
+      <div class="shell nav">
+        <a class="brand" href="/" aria-label={`${siteConfig.title} 首页`}>
+          <span class="brand-mark">B</span>
+          <span>{siteConfig.title}</span>
+        </a>
+        <div class="nav-actions">
+          <nav class="nav-links" aria-label="主导航">
+            {
+              siteConfig.nav.map((item) => (
+                <a
+                  href={item.href}
+                  aria-current={
+                    currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))
+                      ? 'page'
+                      : undefined
+                  }
+                >
+                  {item.label}
+                </a>
+              ))
+            }
+          </nav>
+          <ThemeToggle />
+        </div>
+      </div>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <span>© {new Date().getFullYear()} {siteConfig.author}</span>
+        <div class="social-links">
+          {siteConfig.socials.map((item) => <a href={item.href}>{item.label}</a>)}
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,56 @@
+<button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换到黑夜模式" aria-pressed="false">
+  <span class="theme-toggle-icon theme-toggle-sun" aria-hidden="true">☀</span>
+  <span class="theme-toggle-icon theme-toggle-moon" aria-hidden="true">☾</span>
+</button>
+
+<script is:inline>
+  (() => {
+    const storageKey = 'theme';
+    const root = document.documentElement;
+    const button = document.getElementById('theme-toggle');
+
+    if (!button) return;
+
+    const setTheme = (theme, persist = true) => {
+      const normalized = theme === 'dark' ? 'dark' : 'light';
+      root.dataset.theme = normalized;
+      root.style.colorScheme = normalized;
+      button.setAttribute('aria-pressed', String(normalized === 'dark'));
+      button.setAttribute('aria-label', normalized === 'dark' ? '切换到白天模式' : '切换到黑夜模式');
+
+      if (!persist) return;
+
+      try {
+        localStorage.setItem(storageKey, normalized);
+      } catch {
+        // localStorage can be unavailable in locked-down browsing modes.
+      }
+    };
+
+    const getStoredTheme = () => {
+      try {
+        const value = localStorage.getItem(storageKey);
+        return value === 'dark' || value === 'light' ? value : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const currentTheme = root.dataset.theme === 'dark' || root.dataset.theme === 'light'
+      ? root.dataset.theme
+      : getStoredTheme() || systemTheme;
+
+    setTheme(currentTheme, false);
+
+    button.addEventListener('click', () => {
+      setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+    });
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === storageKey && (event.newValue === 'dark' || event.newValue === 'light')) {
+        setTheme(event.newValue, false);
+      }
+    });
+  })();
+</script>

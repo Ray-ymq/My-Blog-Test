@@ -1,0 +1,15 @@
+dist/
+.astro/
+node_modules/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local verification artifacts
+dark-*.png
+dev-*.log
+dev-*.err

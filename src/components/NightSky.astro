@@ -1,0 +1,268 @@
+<canvas class="night-sky" data-night-sky aria-hidden="true"></canvas>
+
+<script is:inline>
+  (() => {
+    const canvas = document.querySelector('[data-night-sky]');
+    const context = canvas?.getContext('2d');
+
+    if (!canvas || !context) return;
+
+    const root = document.documentElement;
+    const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const starColors = ['#f1eea2', '#fff7b8', '#bfc5ff', '#e7e3a8', '#ffffff'];
+
+    let width = 0;
+    let height = 0;
+    let stars = [];
+    let particles = [];
+    let meteors = [];
+    let frameId = 0;
+    let lastFrame = 0;
+    let nextMeteorIn = 120;
+    let reducedMotion = reduceMotionQuery.matches;
+
+    const random = (min, max) => min + Math.random() * (max - min);
+
+    const isDark = () => root.dataset.theme === 'dark';
+
+    const resize = () => {
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * ratio);
+      canvas.height = Math.floor(height * ratio);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+      const starCount = Math.round(Math.min(320, Math.max(150, (width * height) / 7600)));
+      const particleCount = Math.round(Math.min(180, Math.max(70, (width * height) / 14000)));
+
+      stars = Array.from({ length: starCount }, () => ({
+        x: random(0, width),
+        y: random(0, height),
+        radius: random(0.5, 1.85),
+        alpha: random(0.28, 0.95),
+        pulse: random(0.45, 1.35),
+        phase: random(0, Math.PI * 2),
+        vx: random(-3.5, 3.5),
+        vy: random(2.5, 10),
+        glow: Math.random() > 0.78,
+        color: starColors[Math.floor(random(0, starColors.length))]
+      }));
+
+      particles = Array.from({ length: particleCount }, () => ({
+        x: random(0, width),
+        y: random(0, height),
+        radius: random(0.35, 1.15),
+        alpha: random(0.08, 0.32),
+        vx: random(-10, 14),
+        vy: random(8, 26),
+        phase: random(0, Math.PI * 2),
+        color: Math.random() > 0.75 ? '#bfc5ff' : '#e7e3a8'
+      }));
+
+      draw(performance.now());
+    };
+
+    const spawnMeteor = () => {
+      const startFromTop = Math.random() > 0.35;
+      const x = startFromTop ? random(width * 0.08, width * 1.16) : random(width * 0.68, width * 1.22);
+      const y = startFromTop ? random(-120, height * 0.42) : random(-20, height * 0.58);
+      const length = random(150, 320);
+      const speed = random(660, 1180);
+      const angle = random(Math.PI * 0.71, Math.PI * 0.84);
+
+      meteors.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        length,
+        life: 0,
+        maxLife: random(0.65, 1.15),
+        width: random(1.1, 2.7)
+      });
+    };
+
+    const wrapPoint = (item, margin = 12) => {
+      if (item.x > width + margin) item.x = -margin;
+      if (item.x < -margin) item.x = width + margin;
+      if (item.y > height + margin) item.y = -margin;
+      if (item.y < -margin) item.y = height + margin;
+    };
+
+    const drawDot = (item, alpha, radius) => {
+      context.globalAlpha = alpha;
+      context.fillStyle = item.color;
+      context.beginPath();
+      context.arc(item.x, item.y, radius, 0, Math.PI * 2);
+      context.fill();
+    };
+
+    const drawParticles = (time, delta) => {
+      for (const particle of particles) {
+        if (!reducedMotion) {
+          particle.x += particle.vx * delta;
+          particle.y += particle.vy * delta;
+          wrapPoint(particle, 18);
+        }
+
+        const shimmer = reducedMotion ? 0 : Math.sin(time * 0.0018 + particle.phase) * 0.07;
+        drawDot(particle, Math.max(0.04, particle.alpha + shimmer), particle.radius);
+      }
+      context.globalAlpha = 1;
+    };
+
+    const drawStars = (time, delta) => {
+      for (const star of stars) {
+        if (!reducedMotion) {
+          star.x += star.vx * delta;
+          star.y += star.vy * delta;
+          wrapPoint(star, 16);
+        }
+
+        const twinkle = reducedMotion ? 0 : Math.sin(time * 0.0015 * star.pulse + star.phase) * 0.22;
+        const alpha = Math.max(0.1, Math.min(1, star.alpha + twinkle));
+
+        if (star.glow) {
+          const gradient = context.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.radius * 5);
+          gradient.addColorStop(0, `rgba(255, 255, 255, ${0.32 * alpha})`);
+          gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          context.globalAlpha = 1;
+          context.fillStyle = gradient;
+          context.beginPath();
+          context.arc(star.x, star.y, star.radius * 5, 0, Math.PI * 2);
+          context.fill();
+        }
+
+        drawDot(star, alpha, star.radius);
+      }
+      context.globalAlpha = 1;
+    };
+
+    const drawMeteors = (delta) => {
+      for (const meteor of meteors) {
+        meteor.life += delta;
+        meteor.x += meteor.vx * delta;
+        meteor.y += meteor.vy * delta;
+
+        const progress = meteor.life / meteor.maxLife;
+        const opacity = Math.max(0, 1 - progress);
+        const tailX = meteor.x - Math.cos(Math.atan2(meteor.vy, meteor.vx)) * meteor.length;
+        const tailY = meteor.y - Math.sin(Math.atan2(meteor.vy, meteor.vx)) * meteor.length;
+        const gradient = context.createLinearGradient(meteor.x, meteor.y, tailX, tailY);
+
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${0.95 * opacity})`);
+        gradient.addColorStop(0.18, `rgba(202, 210, 255, ${0.58 * opacity})`);
+        gradient.addColorStop(0.52, `rgba(145, 155, 190, ${0.24 * opacity})`);
+        gradient.addColorStop(1, 'rgba(202, 210, 255, 0)');
+
+        context.strokeStyle = gradient;
+        context.lineWidth = meteor.width;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(meteor.x, meteor.y);
+        context.lineTo(tailX, tailY);
+        context.stroke();
+      }
+
+      meteors = meteors.filter((meteor) => (
+        meteor.life < meteor.maxLife
+        && meteor.x > -meteor.length
+        && meteor.y < height + meteor.length
+      ));
+    };
+
+    const draw = (time) => {
+      context.clearRect(0, 0, width, height);
+      context.fillStyle = '#0d0d12';
+      context.fillRect(0, 0, width, height);
+
+      if (!reducedMotion) {
+        const delta = Math.min(0.05, (time - lastFrame) / 1000 || 0);
+        nextMeteorIn -= delta * 1000;
+
+        if (nextMeteorIn <= 0) {
+          const burst = Math.floor(random(1, 4));
+          for (let index = 0; index < burst; index += 1) {
+            if (meteors.length < 22) spawnMeteor();
+          }
+          nextMeteorIn = random(260, 820);
+        }
+
+        drawParticles(time, delta);
+        drawStars(time, delta);
+        drawMeteors(delta);
+        lastFrame = time;
+      } else {
+        drawParticles(time, 0);
+        drawStars(time, 0);
+      }
+    };
+
+    const animate = (time) => {
+      if (!isDark()) {
+        frameId = 0;
+        return;
+      }
+
+      draw(time);
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    const start = () => {
+      if (frameId || !isDark()) return;
+      lastFrame = performance.now();
+      nextMeteorIn = 80;
+      if (!reducedMotion && meteors.length === 0) {
+        for (let index = 0; index < 8; index += 1) spawnMeteor();
+      }
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    const stop = () => {
+      if (!frameId) return;
+      window.cancelAnimationFrame(frameId);
+      frameId = 0;
+      meteors = [];
+      context.clearRect(0, 0, width, height);
+    };
+
+    const sync = () => {
+      if (isDark()) {
+        draw(performance.now());
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    new MutationObserver(sync).observe(root, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+
+    window.addEventListener('resize', () => {
+      resize();
+      sync();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        sync();
+      }
+    });
+
+    reduceMotionQuery.addEventListener('change', (event) => {
+      reducedMotion = event.matches;
+      meteors = [];
+      sync();
+    });
+
+    resize();
+    sync();
+  })();
+</script>

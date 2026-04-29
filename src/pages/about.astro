@@ -1,0 +1,24 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { siteConfig } from '@/config/site';
+---
+
+<BaseLayout title="关于我" description="关于作者、博客方向和联系方式。">
+  <section class="shell hero">
+    <div>
+      <p class="eyebrow">About</p>
+      <h1>关于 {siteConfig.author}</h1>
+      <p class="lead">
+        这里用于放置你的个人介绍、技术方向、项目经历和联系方式。第一版先保留配置化占位，后续替换为真实信息即可。
+      </p>
+      <div class="actions">
+        {siteConfig.socials.map((item) => <a class="button" href={item.href}>{item.label}</a>)}
+      </div>
+    </div>
+    <aside class="profile-panel" aria-label="博客方向">
+      <img src={siteConfig.avatar} alt={`${siteConfig.author} 的头像`} width="96" height="96" />
+      <h2>博客方向</h2>
+      <p>技术笔记、项目复盘、工程实践、个人成长。</p>
+    </aside>
+  </section>
+</BaseLayout>
